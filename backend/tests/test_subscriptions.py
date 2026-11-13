@@ -4,7 +4,7 @@ import urllib.error
 import os
 import unittest
 from io import BytesIO
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -73,6 +73,87 @@ class SubscriptionPaymentTests(unittest.TestCase):
         self.assertTrue(result["reference"].startswith("mhw-"))
         self.assertEqual(self.connection.execute.call_count, 2)
 
+    @patch("backend.main.get_connection")
+    def test_subscription_status_finds_a_pending_renewal(self, get_connection):
+        get_connection.return_value = self.connection
+        token = backend.create_subscription_token(
+            os.environ.get("ADMIN_USERNAME", "aurapos")
+        )
+        expiry = MagicMock()
+        expiry.fetchone.return_value = None
+        pending_payment = MagicMock()
+        pending_payment.fetchone.return_value = (
+            "mhw-0123456789abcdef0123456789abcdef",
+            "pending",
+            "Approve the M-Pesa prompt on your phone.",
+        )
+        self.connection.execute.side_effect = [expiry, pending_payment]
+
+        response = self.client.get(
+            "/subscription/status",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "pending")
+        self.assertEqual(
+            response.json()["reference"],
+            "mhw-0123456789abcdef0123456789abcdef",
+        )
+
+    @patch("backend.main.start_subscription_payment")
+    @patch("backend.main.get_connection")
+    def test_due_renewal_sends_prompt_for_the_stored_number(
+        self, get_connection, start_payment
+    ):
+        get_connection.return_value = self.connection
+        subscription = MagicMock()
+        subscription.fetchone.return_value = (
+            "payments@example.com",
+            "+254712345678",
+            datetime(2026, 12, 1, tzinfo=timezone.utc),
+        )
+        recent_manual_payment = MagicMock()
+        recent_manual_payment.fetchone.return_value = None
+        self.connection.execute.side_effect = [
+            MagicMock(),
+            subscription,
+            recent_manual_payment,
+        ]
+        start_payment.return_value = {"status": "pending"}
+
+        backend.send_due_subscription_renewal()
+
+        start_payment.assert_called_once_with(
+            "payments@example.com",
+            "+254712345678",
+            date(2026, 12, 1),
+        )
+
+    @patch("backend.main.start_subscription_payment")
+    @patch("backend.main.get_connection")
+    def test_due_renewal_does_not_duplicate_a_recent_manual_prompt(
+        self, get_connection, start_payment
+    ):
+        get_connection.return_value = self.connection
+        subscription = MagicMock()
+        subscription.fetchone.return_value = (
+            "payments@example.com",
+            "+254712345678",
+            datetime(2026, 12, 1, tzinfo=timezone.utc),
+        )
+        recent_manual_payment = MagicMock()
+        recent_manual_payment.fetchone.return_value = ("pending",)
+        self.connection.execute.side_effect = [
+            MagicMock(),
+            subscription,
+            recent_manual_payment,
+        ]
+
+        backend.send_due_subscription_renewal()
+
+        start_payment.assert_not_called()
+
     def test_payment_initialization_requires_login(self):
         with patch("backend.main.paystack_request") as paystack_request:
             response = self.client.post(
@@ -130,6 +211,7 @@ class SubscriptionPaymentTests(unittest.TestCase):
         expiry = MagicMock()
         expiry.fetchone.return_value = (expires_at,)
         self.connection.execute.side_effect = [
+            MagicMock(),
             pending_payment,
             updated_payment,
             MagicMock(),
@@ -150,7 +232,10 @@ class SubscriptionPaymentTests(unittest.TestCase):
         self.assertEqual(result["status"], "active")
         self.assertEqual(result["expires_at"], expires_at.isoformat())
         self.connection.commit.assert_called_once()
-        self.assertIn("GREATEST", self.connection.execute.call_args_list[2].args[0])
+        activation_sql = self.connection.execute.call_args_list[3].args[0]
+        self.assertIn("GREATEST", activation_sql)
+        self.assertIn("Africa/Nairobi", activation_sql)
+        self.assertIn("date_trunc", activation_sql)
 
     @patch("backend.main.get_connection")
     def test_wrong_payment_amount_does_not_activate_subscription(self, get_connection):

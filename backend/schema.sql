@@ -144,12 +144,19 @@ CREATE TABLE IF NOT EXISTS subscription_payments (
   status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
   authorization_url TEXT,
   display_text TEXT,
+  renewal_for DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   paid_at TIMESTAMPTZ
 );
 
 ALTER TABLE subscription_payments
   ADD COLUMN IF NOT EXISTS display_text TEXT;
+
+ALTER TABLE subscription_payments
+  ADD COLUMN IF NOT EXISTS renewal_for DATE;
+
+CREATE UNIQUE INDEX IF NOT EXISTS subscription_payments_renewal_for_idx
+  ON subscription_payments(renewal_for);
 
 CREATE INDEX IF NOT EXISTS products_category_idx ON products(category);
 CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders(created_at DESC);

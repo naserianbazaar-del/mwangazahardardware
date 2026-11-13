@@ -120,8 +120,15 @@ export async function apiDelete(endpoint: string): Promise<void> {
   }
 }
 
-export async function publicApiGet<T>(path: string): Promise<T> {
-  const response = await fetch(apiRootUrl(path));
+export async function publicApiGet<T>(
+  path: string,
+  authorizationToken?: string
+): Promise<T> {
+  const response = await fetch(apiRootUrl(path), {
+    headers: authorizationToken
+      ? { Authorization: `Bearer ${authorizationToken}` }
+      : {},
+  });
   if (!response.ok) throw await getApiError(response);
   return normalizeKeys(await response.json()) as T;
 }

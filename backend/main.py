@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -10,7 +11,7 @@ import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
 from decimal import Decimal
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
@@ -40,6 +41,7 @@ SUBSCRIPTION_PRICE_KES = 3_000
 SUBSCRIPTION_AMOUNT_SUBUNITS = SUBSCRIPTION_PRICE_KES * 100
 ACCESS_TOKEN_LIFETIME = timedelta(hours=24)
 SUBSCRIPTION_TOKEN_LIFETIME = timedelta(minutes=15)
+NAIROBI_TIMEZONE = timezone(timedelta(hours=3))
 logger = logging.getLogger(__name__)
 
 
@@ -153,7 +155,15 @@ class SupplierPaymentCreate(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    yield
+    renewal_task = asyncio.create_task(run_subscription_renewal_scheduler())
+    try:
+        yield
+    finally:
+        renewal_task.cancel()
+        try:
+            await renewal_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Mwazanga Hardware POS API", version="1.0.0", lifespan=lifespan)
@@ -377,6 +387,9 @@ def activate_subscription(reference: str, transaction: dict[str, Any]) -> dict[s
         )
 
     with get_connection() as connection:
+        connection.execute(
+            "SELECT pg_advisory_xact_lock(hashtext(%s))", (SUBSCRIPTION_ID,)
+        )
         payment = connection.execute(
             "SELECT status FROM subscription_payments WHERE reference = %s FOR UPDATE",
             (reference,),
@@ -409,14 +422,21 @@ def activate_subscription(reference: str, transaction: dict[str, Any]) -> dict[s
             """
             INSERT INTO subscriptions (id, email, phone, expires_at, updated_at)
             SELECT %s, payment.email, payment.phone,
-                   NOW() + INTERVAL '30 days', NOW()
+                   (date_trunc('month', NOW() AT TIME ZONE 'Africa/Nairobi')
+                       + INTERVAL '1 month') AT TIME ZONE 'Africa/Nairobi',
+                   NOW()
             FROM subscription_payments AS payment
             WHERE payment.reference = %s
             ON CONFLICT (id) DO UPDATE
             SET email = EXCLUDED.email,
                 phone = EXCLUDED.phone,
-                expires_at = GREATEST(subscriptions.expires_at, NOW())
-                    + INTERVAL '30 days',
+                expires_at = (
+                    date_trunc(
+                        'month',
+                        GREATEST(subscriptions.expires_at, NOW())
+                            AT TIME ZONE 'Africa/Nairobi'
+                    ) + INTERVAL '1 month'
+                ) AT TIME ZONE 'Africa/Nairobi',
                 updated_at = NOW()
             """,
             (SUBSCRIPTION_ID, reference),
@@ -567,25 +587,25 @@ def complete_login(request: Request) -> dict[str, Any]:
     }
 
 
-@app.post("/subscription/payments/initialize")
-def initialize_subscription_payment(
-    request: Request,
-    payment_request: SubscriptionPaymentRequest,
-) -> dict[str, Any]:
-    if get_payment_username(request) is None:
-        raise HTTPException(status_code=401, detail="Login before starting payment")
-    email = get_paystack_billing_email()
-    phone = normalize_kenyan_phone(payment_request.phone)
+def start_subscription_payment(
+    email: str,
+    phone: str,
+    renewal_for: date | None = None,
+) -> dict[str, Any] | None:
     reference = f"mhw-{uuid4().hex}"
     with get_connection() as connection:
-        connection.execute(
+        inserted = connection.execute(
             """
             INSERT INTO subscription_payments
-              (reference, email, phone, amount, status)
-            VALUES (%s, %s, %s, %s, 'pending')
+              (reference, email, phone, amount, status, renewal_for)
+            VALUES (%s, %s, %s, %s, 'pending', %s)
+            ON CONFLICT (renewal_for) DO NOTHING
+            RETURNING reference
             """,
-            (reference, email, phone, SUBSCRIPTION_AMOUNT_SUBUNITS),
-        )
+            (reference, email, phone, SUBSCRIPTION_AMOUNT_SUBUNITS, renewal_for),
+        ).fetchone()
+        if inserted is None:
+            return None
         connection.commit()
 
     try:
@@ -604,6 +624,10 @@ def initialize_subscription_payment(
             },
         )
         provider_data = provider_response.get("data", {})
+        if not isinstance(provider_data, dict):
+            raise HTTPException(
+                status_code=502, detail="Invalid charge response from payment provider"
+            )
         provider_status = provider_data.get("status")
         if provider_data.get("reference") != reference or provider_status not in {
             "pay_offline",
@@ -661,6 +685,51 @@ def initialize_subscription_payment(
             "display_text",
             "Check your phone and approve the M-Pesa payment prompt.",
         ),
+    }
+
+
+@app.post("/subscription/payments/initialize")
+def initialize_subscription_payment(
+    request: Request,
+    payment_request: SubscriptionPaymentRequest,
+) -> dict[str, Any]:
+    if get_payment_username(request) is None:
+        raise HTTPException(status_code=401, detail="Login before starting payment")
+    email = get_paystack_billing_email()
+    phone = normalize_kenyan_phone(payment_request.phone)
+    result = start_subscription_payment(email, phone)
+    if result is None:
+        raise HTTPException(status_code=409, detail="Unable to start payment")
+    return result
+
+
+@app.get("/subscription/status")
+def subscription_status(request: Request) -> dict[str, Any]:
+    if get_payment_username(request) is None:
+        raise HTTPException(status_code=401, detail="A valid login is required")
+    expiry = get_subscription_expiry()
+    if expiry is not None:
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry > datetime.now(timezone.utc):
+            return {"status": "active", "expires_at": expiry.isoformat()}
+
+    with get_connection() as connection:
+        payment = connection.execute(
+            """
+            SELECT reference, status, display_text
+            FROM subscription_payments
+            WHERE status IN ('pending', 'failed')
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    if payment is None:
+        return {"status": "inactive"}
+    return {
+        "status": payment[1],
+        "reference": payment[0],
+        "display_text": payment[2],
     }
 
 
@@ -736,6 +805,67 @@ async def paystack_webhook(request: Request) -> dict[str, str]:
         return {"status": "pending"}
     activate_subscription(reference, verified)
     return {"status": "processed"}
+
+
+def send_due_subscription_renewal() -> None:
+    with get_connection() as connection:
+        connection.execute(
+            "SELECT pg_advisory_xact_lock(hashtext(%s))", (SUBSCRIPTION_ID,)
+        )
+        subscription = connection.execute(
+            """
+            SELECT email, phone, expires_at
+            FROM subscriptions
+            WHERE id = %s AND expires_at <= NOW()
+            FOR UPDATE
+            """,
+            (SUBSCRIPTION_ID,),
+        ).fetchone()
+        if subscription is None:
+            return
+        expiry = subscription[2]
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        recent_manual_payment = connection.execute(
+            """
+            SELECT 1
+            FROM subscription_payments
+            WHERE status = 'pending'
+              AND renewal_for IS NULL
+              AND created_at >= %s - INTERVAL '1 day'
+            LIMIT 1
+            """,
+            (expiry,),
+        ).fetchone()
+        if recent_manual_payment is not None:
+            return
+        renewal_for = expiry.astimezone(NAIROBI_TIMEZONE).date()
+        connection.commit()
+
+    try:
+        result = start_subscription_payment(
+            subscription[0], subscription[1], renewal_for
+        )
+    except HTTPException as error:
+        logger.error(
+            "Unable to send subscription renewal prompt for %s: %s",
+            renewal_for,
+            error.detail,
+        )
+        return
+    if result is not None and result["status"] == "failed":
+        logger.warning("Subscription renewal prompt failed for %s", renewal_for)
+    elif result is not None:
+        logger.info("Sent subscription renewal prompt for %s", renewal_for)
+
+
+async def run_subscription_renewal_scheduler() -> None:
+    while True:
+        try:
+            await asyncio.to_thread(send_due_subscription_renewal)
+        except psycopg.Error:
+            logger.exception("Subscription renewal scheduler database error")
+        await asyncio.sleep(60)
 
 
 @app.get("/api/categories")

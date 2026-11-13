@@ -13,8 +13,10 @@ import { toast } from "sonner";
 type PaymentStatus = "idle" | "checking" | "pending" | "active" | "failed" | "error";
 
 interface PaymentVerification {
-  status: "active" | "pending" | "failed";
+  status: "active" | "pending" | "failed" | "inactive";
   expiresAt?: string | null;
+  reference?: string;
+  displayText?: string | null;
 }
 
 export default function SubscribePage() {
@@ -64,7 +66,7 @@ export default function SubscribePage() {
       const result = await publicApiGet<PaymentVerification>(
         `/subscription/payments/verify/${encodeURIComponent(paymentReference)}`
       );
-      setPaymentStatus(result.status);
+      setPaymentStatus(result.status === "inactive" ? "idle" : result.status);
       setExpiresAt(result.expiresAt || null);
       setVerificationMessage("");
       if (result.status === "active") {
@@ -88,8 +90,40 @@ export default function SubscribePage() {
     setIsLoginVerified(true);
     const query = new URLSearchParams(window.location.search);
     const paymentReference = query.get("reference") || query.get("trxref");
-    if (paymentReference) void verifyPayment(paymentReference);
-  }, [router, verifyPayment]);
+    if (paymentReference) {
+      void verifyPayment(paymentReference);
+      return;
+    }
+
+    const subscriptionToken = sessionStorage.getItem("subscriptionToken");
+    if (!subscriptionToken) return;
+    setPaymentStatus("checking");
+    void publicApiGet<PaymentVerification>(
+      "/subscription/status",
+      subscriptionToken
+    )
+      .then((result) => {
+        setExpiresAt(result.expiresAt || null);
+        if (result.status === "active") {
+          setPaymentStatus("active");
+          void completeLogin();
+        } else if (result.reference) {
+          setReference(result.reference);
+          setDisplayText(result.displayText || "");
+          setPaymentStatus(result.status === "failed" ? "failed" : "pending");
+        } else {
+          setPaymentStatus("idle");
+        }
+      })
+      .catch((error: unknown) => {
+        setPaymentStatus("idle");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Unable to check subscription status."
+        );
+      });
+  }, [completeLogin, router, verifyPayment]);
 
   useEffect(() => {
     if (paymentStatus !== "pending" || !reference) return;
@@ -155,13 +189,15 @@ export default function SubscribePage() {
         </div>
 
         <div className="mb-6 rounded-xl bg-ceramic-background p-5 text-center">
-          <p className="text-sm text-muted-foreground">30 days of access</p>
+          <p className="text-sm text-muted-foreground">Monthly access</p>
           <p className="mt-1 text-3xl font-bold text-ceramic-accent">
             KSh 3,000
             <span className="text-base font-medium text-muted-foreground"> / month</span>
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Renew monthly. An M-Pesa prompt will be sent to your number.
+            Access starts after payment. Renewal prompts are sent on the 1st
+            of each month and must be approved on your phone. Access pauses if
+            payment is not completed by expiry.
           </p>
         </div>
 
