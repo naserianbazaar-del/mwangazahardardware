@@ -307,6 +307,9 @@ def paystack_request(path: str, payload: dict[str, Any] | None = None) -> dict[s
         headers={
             "Authorization": f"Bearer {secret_key}",
             "Content-Type": "application/json",
+            # Paystack's Cloudflare layer rejects the default Python-urllib
+            # user agent with HTTP 403 (error 1010).
+            "User-Agent": "mwangazahardware-backend/1.0",
         },
         method="POST" if payload is not None else "GET",
     )
@@ -314,8 +317,9 @@ def paystack_request(path: str, payload: dict[str, Any] | None = None) -> dict[s
         with urllib.request.urlopen(request, timeout=20) as response:
             result = json.loads(response.read())
     except urllib.error.HTTPError as error:
+        raw_body = error.read()
         try:
-            error_payload = json.loads(error.read())
+            error_payload = json.loads(raw_body)
         except (json.JSONDecodeError, UnicodeDecodeError):
             error_payload = {}
         provider_message = (
@@ -330,7 +334,11 @@ def paystack_request(path: str, payload: dict[str, Any] | None = None) -> dict[s
                 "Paystack returned HTTP %s: %s", error.code, provider_message
             )
         else:
-            logger.error("Paystack returned HTTP %s", error.code)
+            logger.error(
+                "Paystack returned HTTP %s: %s",
+                error.code,
+                raw_body[:200].decode("utf-8", "replace").strip(),
+            )
         detail = "The payment provider rejected the request"
         if provider_message:
             detail = f"Paystack rejected the request: {provider_message}"
