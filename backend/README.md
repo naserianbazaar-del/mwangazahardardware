@@ -12,7 +12,7 @@ python -m uvicorn backend.main:app --reload --port 8000
 
 The API is available at `http://localhost:8000`. OpenAPI documentation is at `/docs`.
 
-The app requires an active KSh 3,000 / 30-day subscription. Put backend settings such as `DATABASE_URL`, admin credentials, `AUTH_TOKEN_SECRET`, and Paystack credentials in the ignored `backend\.env` file (see `backend\.env.example`), then run `backend\init_db.py` to add the subscription tables. Customers log in first, provide only an M-Pesa number, receive an STK push, and are signed into the dashboard after Paystack confirms payment. Configure `POST /paystack/webhook` in the Paystack dashboard.
+The app requires an active KSh 3,000 / 30-day subscription. Set `ADMIN_USERNAME` to the admin login username and `PAYSTACK_CUSTOMER_EMAIL` to the email Paystack should receive for M-Pesa charges. Put these and other backend settings such as `DATABASE_URL`, `ADMIN_PASSWORD`, `AUTH_TOKEN_SECRET`, and Paystack credentials in the ignored `backend\.env` file (see `backend\.env.example`), then run `backend\init_db.py` to add the subscription tables. Customers log in first, provide only an M-Pesa number, receive an STK push, and are signed into the dashboard after Paystack confirms payment. Configure `POST /paystack/webhook` in the Paystack dashboard.
 
 Backend tests are kept in `backend\tests`. Run them from the repository root with:
 

@@ -251,7 +251,7 @@ PAYSTACK_CUSTOMER_EMAIL=billing@example.com
 CORS_ORIGINS=https://your-frontend.example
 ```
 
-Paystack requires an email in its charge API, so the backend uses `PAYSTACK_CUSTOMER_EMAIL` or falls back to `NEXT_PUBLIC_BUSINESS_EMAIL`. This billing address is server-configured and is not requested from the customer.
+Paystack requires an email in its charge API, so the backend uses `PAYSTACK_CUSTOMER_EMAIL` or falls back to `NEXT_PUBLIC_BUSINESS_EMAIL`. `ADMIN_USERNAME` is the separate username used to sign in; the billing email is server-configured and is not requested from the customer.
 
 Public payment endpoints:
 
