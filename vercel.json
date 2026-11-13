@@ -6,7 +6,6 @@
   "env": {
     "NEXT_PUBLIC_APP_NAME": "Mwazanga Hardware"
   },
-  "envPrefix": "NEXT_PUBLIC_",
   "headers": [
     {
       "source": "/api/(.*)",
