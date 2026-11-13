@@ -30,8 +30,12 @@ class SubscriptionPaymentTests(unittest.TestCase):
         clear=False,
     )
     @patch("backend.main.get_connection")
+    @patch(
+        "backend.main.utc_now",
+        return_value=datetime(2026, 12, 1, tzinfo=timezone.utc),
+    )
     def test_initializes_kes_mobile_money_checkout(
-        self, get_connection
+        self, utc_now, get_connection
     ):
         get_connection.return_value = self.connection
         token = backend.create_subscription_token(
@@ -74,7 +78,13 @@ class SubscriptionPaymentTests(unittest.TestCase):
         self.assertEqual(self.connection.execute.call_count, 2)
 
     @patch("backend.main.get_connection")
-    def test_subscription_status_finds_a_pending_renewal(self, get_connection):
+    @patch(
+        "backend.main.utc_now",
+        return_value=datetime(2026, 12, 1, tzinfo=timezone.utc),
+    )
+    def test_subscription_status_finds_a_pending_renewal(
+        self, utc_now, get_connection
+    ):
         get_connection.return_value = self.connection
         token = backend.create_subscription_token(
             os.environ.get("ADMIN_USERNAME", "aurapos")
@@ -100,6 +110,28 @@ class SubscriptionPaymentTests(unittest.TestCase):
             response.json()["reference"],
             "mhw-0123456789abcdef0123456789abcdef",
         )
+
+    @patch("backend.main.get_connection")
+    @patch(
+        "backend.main.utc_now",
+        return_value=datetime(2026, 11, 30, 20, tzinfo=timezone.utc),
+    )
+    def test_payment_initialization_is_closed_before_december(
+        self, utc_now, get_connection
+    ):
+        token = backend.create_subscription_token(
+            os.environ.get("ADMIN_USERNAME", "aurapos")
+        )
+
+        response = self.client.post(
+            "/subscription/payments/initialize",
+            json={"phone": "0712345678"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("December 1, 2026", response.json()["detail"])
+        get_connection.assert_not_called()
 
     @patch("backend.main.start_subscription_payment")
     @patch("backend.main.get_connection")

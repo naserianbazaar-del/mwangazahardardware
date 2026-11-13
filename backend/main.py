@@ -42,11 +42,18 @@ SUBSCRIPTION_AMOUNT_SUBUNITS = SUBSCRIPTION_PRICE_KES * 100
 ACCESS_TOKEN_LIFETIME = timedelta(hours=24)
 SUBSCRIPTION_TOKEN_LIFETIME = timedelta(minutes=15)
 NAIROBI_TIMEZONE = timezone(timedelta(hours=3))
+SUBSCRIPTION_BILLING_START = datetime(
+    2026, 12, 1, tzinfo=NAIROBI_TIMEZONE
+).astimezone(timezone.utc)
 logger = logging.getLogger(__name__)
 
 
 def get_connection() -> psycopg.Connection:
     return psycopg.connect(DATABASE_URL)
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def row_to_dict(row: tuple[Any, ...], columns: list[str]) -> dict[str, Any]:
@@ -275,12 +282,15 @@ def get_subscription_expiry() -> datetime | None:
 
 
 def subscription_is_active() -> bool:
+    now = utc_now()
+    if now < SUBSCRIPTION_BILLING_START:
+        return True
     expiry = get_subscription_expiry()
     if expiry is None:
         return False
     if expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
-    return expiry > datetime.now(timezone.utc)
+    return expiry > now
 
 
 def normalize_kenyan_phone(phone: str) -> str:
@@ -562,16 +572,16 @@ def auth_session(request: Request) -> dict[str, Any]:
     if username is None:
         raise HTTPException(status_code=401, detail="Authentication required")
     expiry = get_subscription_expiry()
-    if expiry is None:
-        raise HTTPException(
-            status_code=402, detail="An active subscription is required"
-        )
-    if expiry.tzinfo is None:
+    now = utc_now()
+    if expiry is not None and expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
-    if expiry <= datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=402, detail="An active subscription is required"
-        )
+    if expiry is None or expiry <= now:
+        if now < SUBSCRIPTION_BILLING_START:
+            expiry = SUBSCRIPTION_BILLING_START
+        else:
+            raise HTTPException(
+                status_code=402, detail="An active subscription is required"
+            )
     return {
         "user": UserResponse(id="admin", username=username, role="admin").model_dump(),
         "subscription_expires_at": expiry.isoformat(),
@@ -703,6 +713,11 @@ def initialize_subscription_payment(
 ) -> dict[str, Any]:
     if get_payment_username(request) is None:
         raise HTTPException(status_code=401, detail="Login before starting payment")
+    if utc_now() < SUBSCRIPTION_BILLING_START:
+        raise HTTPException(
+            status_code=409,
+            detail="Subscription payments begin on December 1, 2026",
+        )
     email = get_paystack_billing_email()
     phone = normalize_kenyan_phone(payment_request.phone)
     result = start_subscription_payment(email, phone)
@@ -716,11 +731,17 @@ def subscription_status(request: Request) -> dict[str, Any]:
     if get_payment_username(request) is None:
         raise HTTPException(status_code=401, detail="A valid login is required")
     expiry = get_subscription_expiry()
+    now = utc_now()
     if expiry is not None:
         if expiry.tzinfo is None:
             expiry = expiry.replace(tzinfo=timezone.utc)
-        if expiry > datetime.now(timezone.utc):
+        if expiry > now:
             return {"status": "active", "expires_at": expiry.isoformat()}
+    if now < SUBSCRIPTION_BILLING_START:
+        return {
+            "status": "active",
+            "expires_at": SUBSCRIPTION_BILLING_START.isoformat(),
+        }
 
     with get_connection() as connection:
         payment = connection.execute(

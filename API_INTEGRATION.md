@@ -237,7 +237,7 @@ export default function DashboardPage() {
 
 ### Subscription and Paystack M-Pesa
 
-The POS requires an active monthly subscription costing KSh 3,000. Access starts after the initial payment and the monthly period ends at midnight East Africa Time on the first of the next month (for a November 2026 start, December 1, 2026). Renewal prompts are sent to the saved M-Pesa number when a period expires. The customer must approve each prompt; this is not an automatic debit. Access is blocked until a renewal payment is confirmed.
+Subscription billing starts on December 1, 2026. Until then, the admin can use the POS without paying. From that date, a KSh 3,000 payment is required to activate the first paid period, which ends at midnight East Africa Time on the first of the next month. Renewal prompts are sent to the saved M-Pesa number when a period expires. The customer must approve each prompt; this is not an automatic debit. Access is blocked until a renewal payment is confirmed.
 
 Configure these server-side environment variables in the ignored `backend/.env` file. The backend and database initializer both load this file; public frontend settings belong in `frontend/.env.local`:
 
@@ -262,7 +262,7 @@ Public payment endpoints:
 - `GET /auth/session` validates the signed bearer token and active subscription for the frontend guard.
 - `POST /auth/complete-login` exchanges the short-lived login token for an access token after payment succeeds.
 
-`POST /auth/login` verifies credentials before checking subscription status. When the subscription is inactive, it returns HTTP 402 with a 15-minute `subscription_token`; this token can only start payment or be exchanged after payment is confirmed. The frontend stores it in session storage, not as a POS access token. All `/api/*` POS endpoints require a normal access token and active subscription, so direct API calls cannot bypass the dashboard gate. The backend's long-running FastAPI service checks for expired subscriptions once per minute and initiates one M-Pesa prompt per billing period. Keep the backend service running for scheduled prompts to be sent on time.
+`POST /auth/login` verifies credentials before checking subscription status. Before December 1, 2026, login and POS API access are allowed without a paid subscription, and checkout is rejected. From December 1 onward, an inactive subscription returns HTTP 402 with a 15-minute `subscription_token`; this token can only start payment or be exchanged after payment is confirmed. The frontend stores it in session storage, not as a POS access token. All `/api/*` POS endpoints require a normal access token and active subscription, so direct API calls cannot bypass the dashboard gate. The backend's long-running FastAPI service checks for expired subscriptions once per minute and initiates one M-Pesa prompt per billing period. Keep the backend service running for scheduled prompts to be sent on time.
 
 Apply the updated database schema with `python backend/init_db.py`. The setup creates `subscriptions` and `subscription_payments` tables. For local testing, use Paystack test credentials. For production, configure the frontend URL in `NEXT_PUBLIC_APP_URL`, the backend API URL in `NEXT_PUBLIC_API_URL`, and the matching frontend origin in `CORS_ORIGINS`. The live secret belongs only in the backend environment, never in a `NEXT_PUBLIC_*` variable.
 

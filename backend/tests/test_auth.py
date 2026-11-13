@@ -2,6 +2,7 @@ import base64
 import os
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -27,6 +28,52 @@ class AuthLoginTests(unittest.TestCase):
         payload = response.json()
         self.assertIn("token", payload)
         self.assertEqual(payload["user"]["username"], "aurapos")
+
+    @patch.dict(os.environ, {"ADMIN_USERNAME": "aurapos", "ADMIN_PASSWORD": "aurapos34"}, clear=False)
+    @patch(
+        "backend.main.utc_now",
+        return_value=datetime(2026, 11, 30, 20, tzinfo=timezone.utc),
+    )
+    def test_login_allows_access_before_december_billing(self, utc_now):
+        response = TestClient(backend.app).post(
+            "/auth/login",
+            json={"username": "aurapos", "password": "aurapos34"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("token", response.json())
+
+    @patch.dict(os.environ, {"ADMIN_USERNAME": "aurapos"}, clear=False)
+    @patch("backend.main.get_subscription_expiry", return_value=None)
+    @patch(
+        "backend.main.utc_now",
+        return_value=datetime(2026, 11, 30, 20, tzinfo=timezone.utc),
+    )
+    def test_auth_session_is_valid_until_billing_starts(
+        self, utc_now, get_subscription_expiry
+    ):
+        token = backend.create_access_token("aurapos")
+
+        response = TestClient(backend.app).get(
+            "/auth/session",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["subscription_expires_at"],
+            backend.SUBSCRIPTION_BILLING_START.isoformat(),
+        )
+
+    @patch("backend.main.get_subscription_expiry", return_value=None)
+    @patch(
+        "backend.main.utc_now",
+        return_value=datetime(2026, 11, 30, 21, tzinfo=timezone.utc),
+    )
+    def test_subscription_is_required_starting_december_first(
+        self, utc_now, get_subscription_expiry
+    ):
+        self.assertFalse(backend.subscription_is_active())
 
     @patch.dict(os.environ, {"ADMIN_USERNAME": "aurapos", "ADMIN_PASSWORD": "aurapos34"}, clear=False)
     def test_login_rejects_demo_credentials(self):
