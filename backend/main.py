@@ -333,8 +333,19 @@ def paystack_request(path: str, payload: dict[str, Any] | None = None) -> dict[s
             status_code=502, detail="Unable to contact the payment provider"
         ) from error
     if not isinstance(result, dict) or result.get("status") is not True:
+        provider_message = (
+            result.get("message")
+            if isinstance(result, dict) and isinstance(result.get("message"), str)
+            else ""
+        )
+        provider_message = provider_message.strip()[:300]
+        if provider_message:
+            logger.error("Paystack rejected the request: %s", provider_message)
+            detail = f"Paystack rejected the request: {provider_message}"
+        else:
+            detail = "The payment provider rejected the request"
         raise HTTPException(
-            status_code=502, detail="The payment provider rejected the request"
+            status_code=502, detail=detail
         )
     return result
 

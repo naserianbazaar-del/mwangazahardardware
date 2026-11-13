@@ -99,6 +99,20 @@ class SubscriptionPaymentTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertIn("M-Pesa is not enabled", raised.exception.detail)
 
+    def test_paystack_rejected_response_message_is_reported(self):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = (
+            b'{"status":false,"message":"M-Pesa charge is unavailable"}'
+        )
+
+        with patch("backend.main.urllib.request.urlopen", return_value=response):
+            with self.assertRaises(backend.HTTPException) as raised:
+                backend.paystack_request("/charge", {"amount": "300000"})
+
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertIn("M-Pesa charge is unavailable", raised.exception.detail)
+
     def test_invalid_kenyan_number_is_rejected(self):
         with self.assertRaises(backend.HTTPException) as raised:
             backend.normalize_kenyan_phone("12345")
