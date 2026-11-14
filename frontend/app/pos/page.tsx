@@ -17,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -53,7 +52,7 @@ export default function POSPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
@@ -88,7 +87,7 @@ export default function POSPage() {
   const subtotal = getCartTotal();
   const total = Math.max(0, subtotal - discountAmount);
 
-  const createReceiptData = (): ReceiptData => ({
+  const createReceiptData = (selectedPaymentMethod: PaymentMethod): ReceiptData => ({
     receiptNumber: `REC-${crypto.randomUUID().toUpperCase()}`,
     items: cart.map((item) => ({
       ...item,
@@ -97,7 +96,7 @@ export default function POSPage() {
     subtotal,
     discount: discountAmount,
     total,
-    paymentMethod,
+    paymentMethod: selectedPaymentMethod,
     createdAt: new Date(),
   });
 
@@ -106,9 +105,24 @@ export default function POSPage() {
       toast.error("Cart is empty");
       return;
     }
-    setReceiptData(createReceiptData());
+    if (!paymentMethod) {
+      toast.error("Choose a payment method to continue");
+      return;
+    }
+    setReceiptData(createReceiptData(paymentMethod));
     setShowCheckoutDialog(false);
     setShowReceiptModal(true);
+  };
+
+  const handleAddToCart = (product: Product) => {
+    const quantityInCart =
+      cart.find((item) => item.product.id === product.id)?.quantity || 0;
+    if (quantityInCart >= product.quantity) {
+      toast.error("Insufficient stock");
+      return;
+    }
+    addToCart(product);
+    setShowCheckoutDialog(true);
   };
 
   const handleSaleConfirmed = (receipt: ReceiptData) => {
@@ -127,6 +141,7 @@ export default function POSPage() {
     );
     clearCart();
     setDiscountAmount(0);
+    setPaymentMethod(null);
     toast.success("Sale recorded and inventory updated");
     void apiGet<Product[]>("/products")
       .then(setProducts)
@@ -242,7 +257,7 @@ export default function POSPage() {
 
                         {/* Add to Cart Button */}
                         <Button
-                          onClick={() => addToCart(product)}
+                          onClick={() => handleAddToCart(product)}
                           disabled={product.quantity === 0}
                           className="w-full bg-ceramic-primary hover:bg-ceramic-primary/90 text-white"
                           size="sm"
@@ -385,31 +400,14 @@ export default function POSPage() {
                   </div>
                 </div>
 
-                {/* Payment Methods */}
-                <div className="space-y-2 pt-2">
-                  <Label className="text-xs">Payment Method</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(["cash", "card", "mobile"] as const).map((method) => (
-                      <Button
-                        key={method}
-                        variant={paymentMethod === method ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setPaymentMethod(method)}
-                        className={paymentMethod === method ? "bg-ceramic-primary" : ""}
-                      >
-                        {method.charAt(0).toUpperCase() + method.slice(1)}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="grid grid-cols-1 gap-2 pt-2">
                   <Button
                     variant="outline"
                     onClick={() => {
                       clearCart();
                       setDiscountAmount(0);
+                      setPaymentMethod(null);
                     }}
                     disabled={cart.length === 0}
                     size="sm"
@@ -417,20 +415,11 @@ export default function POSPage() {
                     Clear Cart
                   </Button>
                   <Dialog open={showCheckoutDialog} onOpenChange={setShowCheckoutDialog}>
-                    <DialogTrigger asChild>
-                      <Button
-                        className="bg-ceramic-primary hover:bg-ceramic-primary/90 text-white"
-                        disabled={cart.length === 0}
-                        size="sm"
-                      >
-                        Checkout
-                      </Button>
-                    </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Review Sale</DialogTitle>
+                        <DialogTitle>Checkout</DialogTitle>
                         <DialogDescription>
-                        Review the order details before choosing a receipt option
+                          Review the order and choose a payment method to continue.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -456,11 +445,22 @@ export default function POSPage() {
                             </span>
                           </div>
                         </div>
-                        <div>
-                          <Label className="text-xs">Payment Method</Label>
-                          <p className="font-medium text-sm mt-1 capitalize">
-                            {paymentMethod}
-                          </p>
+                        <div className="space-y-2">
+                          <Label>Payment Method</Label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(["cash", "card", "mobile"] as const).map((method) => (
+                              <Button
+                                key={method}
+                                type="button"
+                                variant={paymentMethod === method ? "default" : "outline"}
+                                onClick={() => setPaymentMethod(method)}
+                                aria-pressed={paymentMethod === method}
+                                className={paymentMethod === method ? "bg-ceramic-primary" : ""}
+                              >
+                                {method.charAt(0).toUpperCase() + method.slice(1)}
+                              </Button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                       <DialogFooter>
@@ -469,6 +469,7 @@ export default function POSPage() {
                         </Button>
                         <Button
                           onClick={handleCheckout}
+                          disabled={!paymentMethod}
                           className="bg-ceramic-primary hover:bg-ceramic-primary/90 text-white"
                         >
                           Continue to Receipt
@@ -483,13 +484,10 @@ export default function POSPage() {
                   variant="outline"
                   className="w-full"
                   disabled={cart.length === 0}
-                  onClick={() => {
-                    setReceiptData(createReceiptData());
-                    setShowReceiptModal(true);
-                  }}
+                  onClick={() => setShowCheckoutDialog(true)}
                 >
                   <Printer className="h-4 w-4 mr-2" />
-                  Receipt Options
+                  Proceed to Checkout
                 </Button>
               </CardContent>
             </Card>
@@ -509,6 +507,7 @@ export default function POSPage() {
             setShowReceiptModal(false);
             clearCart();
             setDiscountAmount(0);
+            setPaymentMethod(null);
             toast.info("Sale cancelled; inventory was not changed");
           }}
         />
