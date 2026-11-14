@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { apiRootUrl } from "@/lib/api";
+import { InstallAppButton } from "@/components/pwa/install-app-button";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -65,6 +66,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-ceramic-background via-white to-ceramic-secondary flex items-center justify-center p-4">
+      <div className="absolute right-4 top-4 z-20">
+        <InstallAppButton />
+      </div>
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-ceramic-primary/5 rounded-full blur-3xl" />

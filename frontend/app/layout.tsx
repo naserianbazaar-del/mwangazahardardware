@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layouts/app-shell";
+import { PwaInstallProvider } from "@/components/pwa/pwa-install-provider";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 import "./globals.css";
 
@@ -34,9 +35,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <AppShell>{children}</AppShell>
-        <RegisterServiceWorker />
-        <Toaster />
+        <PwaInstallProvider>
+          <AppShell>{children}</AppShell>
+          <RegisterServiceWorker />
+          <Toaster />
+        </PwaInstallProvider>
       </body>
     </html>
   );
