@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/utils/format";
 import { Badge } from "@/components/ui/badge";
 import { apiGet } from "@/lib/api";
 import type { Customer, Expense, Order, Product, SupplierPurchase } from "@/types";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 const COLORS = ["#C46A32", "#E8D7C5", "#2F2F2F"];
 
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [supplierPurchases, setSupplierPurchases] = useState<SupplierPurchase[]>([]);
+  const refreshKey = useRefreshOnFocus();
 
   useEffect(() => {
     const loadData = async () => {
@@ -39,7 +41,7 @@ export default function DashboardPage() {
     };
 
     loadData();
-  }, []);
+  }, [refreshKey]);
 
   const dashboardMetrics = useMemo(() => {
     const today = new Date();

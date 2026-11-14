@@ -22,12 +22,14 @@ import {
 import { TrendingUp, DollarSign, ShoppingCart } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import type { Order, Product } from "@/types";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 const COLORS = ["#C46A32", "#E8D7C5", "#2F2F2F"];
 
 export default function ReportsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const refreshKey = useRefreshOnFocus();
 
   useEffect(() => {
     const loadData = async () => {
@@ -44,7 +46,7 @@ export default function ReportsPage() {
     };
 
     loadData();
-  }, []);
+  }, [refreshKey]);
 
   const topProducts = useMemo(
     () =>

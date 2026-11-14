@@ -164,6 +164,20 @@ class CategoryCreateTests(unittest.TestCase):
         ))
 
     @patch("backend.main.get_connection")
+    def test_api_data_responses_are_not_cached(self, get_connection):
+        get_connection.return_value = self.connection
+        self.connection.execute.return_value.fetchall.return_value = []
+
+        response = self.client.get("/api/categories")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["cache-control"],
+            "no-store, no-cache, must-revalidate",
+        )
+        self.assertEqual(response.headers["pragma"], "no-cache")
+
+    @patch("backend.main.get_connection")
     def test_create_category_reports_duplicate_name(self, get_connection):
         get_connection.return_value = self.connection
         self.connection.execute.side_effect = backend.psycopg.errors.UniqueViolation(

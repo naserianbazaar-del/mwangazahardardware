@@ -19,6 +19,7 @@ import type {
   SupplierPurchase,
 } from "@/types";
 import { toast } from "sonner";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 const expenseCategories: { value: ExpenseCategory; label: string }[] = [
   { value: "rent", label: "Rent" },
@@ -80,6 +81,7 @@ export default function ExpensesPage() {
   const [paymentMethodByPurchase, setPaymentMethodByPurchase] = useState<
     Record<string, PaymentMethod>
   >({});
+  const refreshKey = useRefreshOnFocus();
 
   const loadData = async () => {
     const [expenseList, supplierList, purchaseList, paymentList, productList] =
@@ -148,7 +150,7 @@ export default function ExpensesPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   const operatingExpenseTotal = useMemo(
     () => expenses.reduce((sum, expense) => sum + Number(expense.amount), 0),

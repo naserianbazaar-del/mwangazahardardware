@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 export default function CategoriesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,6 +36,7 @@ export default function CategoriesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({ name: "", description: "" });
+  const refreshKey = useRefreshOnFocus();
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -51,7 +53,7 @@ export default function CategoriesPage() {
     };
 
     loadCategories();
-  }, []);
+  }, [refreshKey]);
 
   const filteredCategories = categories.filter((c) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())

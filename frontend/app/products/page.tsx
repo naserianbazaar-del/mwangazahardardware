@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,6 +52,7 @@ export default function ProductsPage() {
     description: "",
     type: "general",
   });
+  const refreshKey = useRefreshOnFocus();
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -67,7 +69,7 @@ export default function ProductsPage() {
     };
 
     loadProducts();
-  }, []);
+  }, [refreshKey]);
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -20,12 +20,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [restockingId, setRestockingId] = useState<string | null>(null);
   const [restockQty, setRestockQty] = useState("");
+  const refreshKey = useRefreshOnFocus();
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -42,7 +44,7 @@ export default function InventoryPage() {
     };
 
     loadProducts();
-  }, []);
+  }, [refreshKey]);
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())

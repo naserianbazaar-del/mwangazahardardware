@@ -472,16 +472,20 @@ async def require_active_subscription(request: Request, call_next: Any):
     if request.method == "OPTIONS":
         return await call_next(request)
     if request.url.path.startswith("/api/"):
-        username = get_token_username(get_bearer_token(request))
-        if username is None:
-            return JSONResponse(
+        if get_token_username(get_bearer_token(request)) is None:
+            response = JSONResponse(
                 status_code=401, content={"detail": "Authentication required"}
             )
-        if not subscription_is_active():
-            return JSONResponse(
+        elif not subscription_is_active():
+            response = JSONResponse(
                 status_code=402,
                 content={"detail": "An active subscription is required"},
             )
+        else:
+            response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
     return await call_next(request)
 
 

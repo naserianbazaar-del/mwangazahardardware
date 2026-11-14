@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,6 +33,7 @@ export default function CustomersPage() {
     phone: "",
     address: "",
   });
+  const refreshKey = useRefreshOnFocus();
 
   useEffect(() => {
     const loadData = async () => {
@@ -52,7 +54,7 @@ export default function CustomersPage() {
     };
 
     loadData();
-  }, []);
+  }, [refreshKey]);
 
   const filteredCustomers = customers.filter((c) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

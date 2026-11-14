@@ -75,6 +75,7 @@ async function getApiError(response: Response): Promise<Error> {
 export async function apiGet<T>(endpoint: string): Promise<T> {
   const response = await fetch(apiRequestUrl(endpoint), {
     method: "GET",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getAuthToken()}`,
@@ -140,6 +141,7 @@ export async function publicApiGet<T>(
   authorizationToken?: string
 ): Promise<T> {
   const response = await fetch(apiRootUrl(path), {
+    cache: "no-store",
     headers: authorizationToken
       ? { Authorization: `Bearer ${authorizationToken}` }
       : {},

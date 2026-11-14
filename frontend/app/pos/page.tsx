@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +57,7 @@ export default function POSPage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const refreshKey = useRefreshOnFocus();
 
   useEffect(() => {
     const loadData = async () => {
@@ -76,7 +78,7 @@ export default function POSPage() {
     };
 
     loadData();
-  }, []);
+  }, [refreshKey]);
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
