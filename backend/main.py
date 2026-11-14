@@ -571,14 +571,14 @@ def auth_session(request: Request) -> dict[str, Any]:
     username = get_token_username(get_bearer_token(request))
     if username is None:
         raise HTTPException(status_code=401, detail="Authentication required")
-    expiry = get_subscription_expiry()
     now = utc_now()
-    if expiry is not None and expiry.tzinfo is None:
-        expiry = expiry.replace(tzinfo=timezone.utc)
-    if expiry is None or expiry <= now:
-        if now < SUBSCRIPTION_BILLING_START:
-            expiry = SUBSCRIPTION_BILLING_START
-        else:
+    if now < SUBSCRIPTION_BILLING_START:
+        expiry = SUBSCRIPTION_BILLING_START
+    else:
+        expiry = get_subscription_expiry()
+        if expiry is not None and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry is None or expiry <= now:
             raise HTTPException(
                 status_code=402, detail="An active subscription is required"
             )
@@ -730,18 +730,18 @@ def initialize_subscription_payment(
 def subscription_status(request: Request) -> dict[str, Any]:
     if get_payment_username(request) is None:
         raise HTTPException(status_code=401, detail="A valid login is required")
-    expiry = get_subscription_expiry()
     now = utc_now()
-    if expiry is not None:
-        if expiry.tzinfo is None:
-            expiry = expiry.replace(tzinfo=timezone.utc)
-        if expiry > now:
-            return {"status": "active", "expires_at": expiry.isoformat()}
     if now < SUBSCRIPTION_BILLING_START:
         return {
             "status": "active",
             "expires_at": SUBSCRIPTION_BILLING_START.isoformat(),
         }
+    expiry = get_subscription_expiry()
+    if expiry is not None:
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry > now:
+            return {"status": "active", "expires_at": expiry.isoformat()}
 
     with get_connection() as connection:
         payment = connection.execute(
@@ -837,6 +837,8 @@ async def paystack_webhook(request: Request) -> dict[str, str]:
 
 
 def send_due_subscription_renewal() -> None:
+    if utc_now() < SUBSCRIPTION_BILLING_START:
+        return
     with get_connection() as connection:
         connection.execute(
             "SELECT pg_advisory_xact_lock(hashtext(%s))", (SUBSCRIPTION_ID,)

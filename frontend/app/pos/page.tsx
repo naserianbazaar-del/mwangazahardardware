@@ -5,7 +5,6 @@ import { Printer, Plus, Minus, X, Search, Filter, ShoppingCart, MessageCircle, D
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/utils/format";
@@ -69,7 +68,11 @@ export default function POSPage() {
         setProducts(productList);
         setCategories(categoryList);
       } catch (error) {
-        toast.error("Unable to load POS inventory from the database");
+        toast.error(
+          error instanceof Error
+            ? `Unable to load POS inventory: ${error.message}`
+            : "Unable to load POS inventory because an unknown error occurred."
+        );
       }
     };
 
@@ -133,7 +136,7 @@ export default function POSPage() {
   };
 
   return (
-    <MainLayout>
+    <>
       <div className="p-6 md:p-8 h-full">
         {/* Page Header */}
         <div className="mb-6">
@@ -510,7 +513,7 @@ export default function POSPage() {
           }}
         />
       )}
-    </MainLayout>
+    </>
   );
 }
 

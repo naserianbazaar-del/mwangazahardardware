@@ -5,7 +5,6 @@ import { Plus, Search, Heart, Eye, Mail, Phone, MapPin } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { apiGet, apiPost } from "@/lib/api";
@@ -44,7 +43,11 @@ export default function CustomersPage() {
         setCustomers(customerList);
         setOrders(orderList);
       } catch (error) {
-        toast.error("Unable to load customer data from the database");
+        toast.error(
+          error instanceof Error
+            ? `Unable to load customer data: ${error.message}`
+            : "Unable to load customer data because an unknown error occurred."
+        );
       }
     };
 
@@ -78,7 +81,6 @@ export default function CustomersPage() {
   };
 
   return (
-    <MainLayout>
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -275,6 +277,5 @@ export default function CustomersPage() {
           ))}
         </div>
       </div>
-    </MainLayout>
   );
 }

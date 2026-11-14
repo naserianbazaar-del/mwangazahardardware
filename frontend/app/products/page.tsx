@@ -5,7 +5,6 @@ import { Plus, Edit, Trash2, Search, Filter } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/utils/format";
 import { apiAssetUrl, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
@@ -179,7 +178,6 @@ export default function ProductsPage() {
   };
 
   return (
-    <MainLayout>
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -535,6 +533,5 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 }

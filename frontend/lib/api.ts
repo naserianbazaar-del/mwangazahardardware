@@ -1,4 +1,17 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const configuredApiUrl = new URL(
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+);
+const configuredApiPath = configuredApiUrl.pathname.replace(/\/+$/, "");
+if (!configuredApiPath) {
+  configuredApiUrl.pathname = "/api";
+} else if (!configuredApiPath.endsWith("/api")) {
+  configuredApiUrl.pathname = `${configuredApiPath}/api`;
+}
+const API_BASE_URL = configuredApiUrl.toString().replace(/\/+$/, "");
+
+function apiRequestUrl(endpoint: string): string {
+  return `${API_BASE_URL}/${endpoint.replace(/^\/+/, "")}`;
+}
 
 export function apiRootUrl(path: string): string {
   return new URL(path, `${new URL(API_BASE_URL).origin}/`).toString();
@@ -44,6 +57,8 @@ async function getApiError(response: Response): Promise<Error> {
   }
 
   if (typeof window !== "undefined" && (response.status === 401 || response.status === 402)) {
+    sessionStorage.removeItem("posVerifiedSessionToken");
+    sessionStorage.removeItem("posVerifiedSessionExpiry");
     if (response.status === 402) {
       const token = localStorage.getItem("authToken");
       if (token) sessionStorage.setItem("subscriptionToken", token);
@@ -58,7 +73,7 @@ async function getApiError(response: Response): Promise<Error> {
 }
 
 export async function apiGet<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(apiRequestUrl(endpoint), {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -74,7 +89,7 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
 }
 
 export async function apiPost<T>(endpoint: string, data: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(apiRequestUrl(endpoint), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -91,7 +106,7 @@ export async function apiPost<T>(endpoint: string, data: unknown): Promise<T> {
 }
 
 export async function apiPut<T>(endpoint: string, data: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(apiRequestUrl(endpoint), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -108,7 +123,7 @@ export async function apiPut<T>(endpoint: string, data: unknown): Promise<T> {
 }
 
 export async function apiDelete(endpoint: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(apiRequestUrl(endpoint), {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${getAuthToken()}`,

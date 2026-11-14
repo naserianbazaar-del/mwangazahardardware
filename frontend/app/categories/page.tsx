@@ -5,7 +5,6 @@ import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { Label } from "@/components/ui/label";
 import { apiGet, apiPost } from "@/lib/api";
 import type { Category } from "@/types";
@@ -43,7 +42,11 @@ export default function CategoriesPage() {
         const data = await apiGet<Category[]>("/categories");
         setCategories(data);
       } catch (error) {
-        toast.error("Unable to load categories from the database");
+        toast.error(
+          error instanceof Error
+            ? `Unable to load categories: ${error.message}`
+            : "Unable to load categories because an unknown error occurred."
+        );
       }
     };
 
@@ -87,7 +90,6 @@ export default function CategoriesPage() {
   };
 
   return (
-    <MainLayout>
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -222,6 +224,5 @@ export default function CategoriesPage() {
           ))}
         </div>
       </div>
-    </MainLayout>
   );
 }

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Package, Users, ShoppingCart, DollarSign } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { Badge } from "@/components/ui/badge";
@@ -139,7 +138,6 @@ export default function DashboardPage() {
   }, [orders]);
 
   return (
-    <MainLayout>
       <div className="min-w-0 p-4 sm:p-6 md:p-8 space-y-6 md:space-y-8">
         {/* Page Header */}
         <div>
@@ -376,6 +374,5 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
-    </MainLayout>
   );
 }

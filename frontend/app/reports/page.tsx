@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { formatCurrency } from "@/utils/format";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -125,7 +124,6 @@ export default function ReportsPage() {
   const avgOrderValue = totalRevenue / Math.max(salesData.reduce((sum, d) => sum + d.orders, 0), 1);
 
   return (
-    <MainLayout>
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div>
@@ -363,6 +361,5 @@ export default function ReportsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </MainLayout>
   );
 }

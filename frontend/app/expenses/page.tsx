@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Wallet, Truck, X } from "lucide-react";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -275,7 +274,6 @@ export default function ExpensesPage() {
   };
 
   return (
-    <MainLayout>
       <div className="space-y-6 p-6 md:p-8">
         <header>
           <h1 className="text-3xl font-bold text-ceramic-accent md:text-4xl">Expenses</h1>
@@ -472,6 +470,5 @@ export default function ExpensesPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </MainLayout>
   );
 }

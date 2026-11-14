@@ -11,6 +11,9 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+const SESSION_TOKEN_KEY = "posVerifiedSessionToken";
+const SESSION_EXPIRY_KEY = "posVerifiedSessionExpiry";
+
 export function MainLayout({ children }: MainLayoutProps) {
   const router = useRouter();
   const isDarkMode = useStore((state) => state.isDarkMode);
@@ -34,12 +37,29 @@ export function MainLayout({ children }: MainLayoutProps) {
     let cancelled = false;
     const token = localStorage.getItem("authToken");
     if (!token) {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      sessionStorage.removeItem(SESSION_EXPIRY_KEY);
       router.replace("/");
       return () => {
         cancelled = true;
       };
     }
 
+    const cachedToken = sessionStorage.getItem(SESSION_TOKEN_KEY);
+    const cachedExpiry = Number(sessionStorage.getItem(SESSION_EXPIRY_KEY));
+    if (
+      cachedToken === token &&
+      Number.isFinite(cachedExpiry) &&
+      cachedExpiry > Date.now()
+    ) {
+      setAccessState("allowed");
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    sessionStorage.removeItem(SESSION_EXPIRY_KEY);
     fetch(apiRootUrl("/auth/session"), {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -49,6 +69,8 @@ export function MainLayout({ children }: MainLayoutProps) {
           if (response.status === 402) {
             sessionStorage.setItem("subscriptionToken", token);
           }
+          sessionStorage.removeItem(SESSION_TOKEN_KEY);
+          sessionStorage.removeItem(SESSION_EXPIRY_KEY);
           localStorage.removeItem("authToken");
           localStorage.removeItem("user");
           router.replace(response.status === 402 ? "/subscribe" : "/");
@@ -58,6 +80,17 @@ export function MainLayout({ children }: MainLayoutProps) {
           setAccessState("error");
           return;
         }
+        return response.json() as Promise<{ subscription_expires_at?: string }>;
+      })
+      .then((session) => {
+        if (cancelled || !session) return;
+        const expiry = Date.parse(session.subscription_expires_at || "");
+        if (!Number.isFinite(expiry) || expiry <= Date.now()) {
+          setAccessState("error");
+          return;
+        }
+        sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+        sessionStorage.setItem(SESSION_EXPIRY_KEY, String(expiry));
         setAccessState("allowed");
       })
       .catch(() => {

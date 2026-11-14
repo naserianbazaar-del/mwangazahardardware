@@ -39,7 +39,7 @@ Vercel is the recommended platform for Next.js applications.
    - Add environment variables in Vercel dashboard
    - Required variables:
      ```
-     NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+     NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
     NEXT_PUBLIC_APP_NAME=Mwazanga Hardware
      ```
 
@@ -51,7 +51,7 @@ Vercel is the recommended platform for Next.js applications.
 
 ```
 Environment: Production
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
 NEXT_PUBLIC_APP_NAME=Mwazanga Hardware
 ```
 
@@ -93,7 +93,7 @@ docker push myregistry/top-notch-pos:latest
 docker run \
   -d \
   -p 3000:3000 \
-  -e NEXT_PUBLIC_API_URL=https://api.yourdomain.com \
+  -e NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api \
   -e NEXT_PUBLIC_APP_NAME="Mwazanga Hardware" \
   --name pos-app \
   top-notch-pos:latest
@@ -125,7 +125,7 @@ services:
     ports:
       - "80:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+      - NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
       - NODE_ENV=production
     restart: always
     networks:
@@ -265,7 +265,7 @@ gcloud run deploy top-notch-pos \
   --source . \
   --platform managed \
   --region us-central1 \
-  --set-env-vars NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+  --set-env-vars NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
 ```
 
 ### App Engine
@@ -281,7 +281,7 @@ handlers:
     script: auto
 
 env_variables:
-  NEXT_PUBLIC_API_URL: "https://api.yourdomain.com"
+  NEXT_PUBLIC_API_URL: "https://api.yourdomain.com/api"
 ```
 
 ```bash
@@ -353,7 +353,7 @@ git push heroku main
 ### Environment Variables
 
 ```bash
-heroku config:set NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+heroku config:set NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
 ```
 
 ---

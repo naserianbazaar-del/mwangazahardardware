@@ -5,7 +5,6 @@ import { AlertCircle, TrendingDown, Package, Plus, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { formatCurrency } from "@/utils/format";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -34,7 +33,11 @@ export default function InventoryPage() {
         const data = await apiGet<Product[]>("/products");
         setProducts(data);
       } catch (error) {
-        toast.error("Unable to load inventory from the database");
+        toast.error(
+          error instanceof Error
+            ? `Unable to load inventory: ${error.message}`
+            : "Unable to load inventory because an unknown error occurred."
+        );
       }
     };
 
@@ -66,7 +69,6 @@ export default function InventoryPage() {
   };
 
   return (
-    <MainLayout>
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div>
@@ -237,6 +239,5 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 }

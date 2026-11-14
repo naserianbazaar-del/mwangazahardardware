@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MainLayout } from "@/components/layouts/main-layout";
 import { useStore } from "@/store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -64,7 +63,6 @@ export default function SettingsPage() {
   };
 
   return (
-    <MainLayout>
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div>
@@ -593,6 +591,5 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </MainLayout>
   );
 }

@@ -26,6 +26,9 @@ export function Navbar() {
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
     localStorage.removeItem("rememberMe");
+    sessionStorage.removeItem("posVerifiedSessionToken");
+    sessionStorage.removeItem("posVerifiedSessionExpiry");
+    sessionStorage.removeItem("subscriptionToken");
     router.replace("/");
   };
 
