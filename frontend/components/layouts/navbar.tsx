@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Moon, Sun, User, LogOut, Settings } from "lucide-react";
+import { Bell, Search, Moon, Sun, User, LogOut, Settings, Download } from "lucide-react";
 import { useStore } from "@/store";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +17,68 @@ import {
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "./sidebar";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+
 export function Navbar() {
   const router = useRouter();
   const isDarkMode = useStore((state) => state.isDarkMode);
   const toggleDarkMode = useStore((state) => state.toggleDarkMode);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const navigatorWithStandalone = window.navigator as Navigator & {
+      standalone?: boolean;
+    };
+    setIsInstalled(
+      window.matchMedia("(display-mode: standalone)").matches ||
+        navigatorWithStandalone.standalone === true
+    );
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      setIsInstalled(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) {
+      toast.info(
+        "Use your browser menu to install the app or add it to your home screen."
+      );
+      return;
+    }
+
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        setInstallPrompt(null);
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? `Unable to install the app: ${error.message}`
+          : "Unable to install the app."
+      );
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
@@ -51,6 +109,19 @@ export function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {!isInstalled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleInstall}
+              aria-label="Install Mwazanga Hardware POS"
+              className="gap-2 px-2"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Install</span>
+            </Button>
+          )}
+
           {/* Mobile Search */}
           <Button
             variant="ghost"
